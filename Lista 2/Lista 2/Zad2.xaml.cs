@@ -1,88 +1,131 @@
-﻿using System.Windows;
-using System.Windows.Controls;
+﻿using System;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Windows;
+using System.Windows.Input;
 
 namespace Lista_2
 {
     public partial class Zad2 : Window
     {
-        private bool isPlayerXTurn = true;
-        private bool gameEnded = false;
-        private int moveCount = 0;
-
         public Zad2()
         {
             InitializeComponent();
+            DataContext = new Game();
+        }
+    }
+
+    public class Game : Base
+    {
+        public ObservableCollection<Box> List { get; set; } 
+
+        private string _info;
+        public string Info
+        {
+            get => _info;
+            set { _info = value; OnProp(); }
         }
 
-        private void Button_Click(object sender, RoutedEventArgs e)
+        private bool _turnX;   
+        private bool _active;  
+
+        public Relay Reset { get; set; }
+
+        public Game()
         {
-            if (gameEnded)
-            {
-                return;
-            }
-
-            Button clickedButton = sender as Button;
-
-            if (clickedButton.Content != null)
-            {
-                return;
-            }
-
-            string currentPlayerSymbol = isPlayerXTurn ? "X" : "O";
-            clickedButton.Content = currentPlayerSymbol;
-            moveCount++;
-
-            if (CheckForWinner(currentPlayerSymbol))
-            {
-                gameEnded = true;
-                MessageBox.Show($"Gratulacje! Wygrał gracz {currentPlayerSymbol}!", "Koniec gry");
-                DisableBoard();
-                return;
-            }
-
-            if (moveCount == 9)
-            {
-                gameEnded = true;
-                MessageBox.Show("Remis! Nikt nie wygrał.", "Koniec gry");
-                DisableBoard();
-                return;
-            }
-
-            isPlayerXTurn = !isPlayerXTurn;
+            Reset = new Relay(o => Start());
+            Start();
         }
 
-        private bool CheckForWinner(string playerSymbol)
+        private void Start()
         {
-            bool CheckLine(Button b1, Button b2, Button b3)
+            List = new ObservableCollection<Box>();
+            for (int i = 0; i < 9; i++)
             {
-                return b1.Content?.ToString() == playerSymbol &&
-                       b2.Content?.ToString() == playerSymbol &&
-                       b3.Content?.ToString() == playerSymbol;
+                var box = new Box();
+                box.Click = new Relay(o => Play(box));
+                List.Add(box);
             }
+            OnProp(nameof(List)); 
 
-            if (CheckLine(Button0_0, Button0_1, Button0_2)) return true;
-            if (CheckLine(Button1_0, Button1_1, Button1_2)) return true;
-            if (CheckLine(Button2_0, Button2_1, Button2_2)) return true;
+            _turnX = true;
+            _active = true;
+            Info = "Ruch: X";
+        }
 
-            if (CheckLine(Button0_0, Button1_0, Button2_0)) return true;
-            if (CheckLine(Button0_1, Button1_1, Button2_1)) return true;
-            if (CheckLine(Button0_2, Button1_2, Button2_2)) return true;
+        private void Play(Box b)
+        {
+            if (!_active || !string.IsNullOrEmpty(b.Sign)) return;
 
-            if (CheckLine(Button0_0, Button1_1, Button2_2)) return true;
-            if (CheckLine(Button0_2, Button1_1, Button2_0)) return true;
+            b.Sign = _turnX ? "X" : "O";
 
+            if (CheckWin())
+            {
+                Info = "Wygrał " + (_turnX ? "X" : "O") + "!";
+                _active = false;
+            }
+            else if (List.All(x => !string.IsNullOrEmpty(x.Sign)))
+            {
+                Info = "Remis!";
+                _active = false;
+            }
+            else
+            {
+                _turnX = !_turnX;
+                Info = "Ruch: " + (_turnX ? "X" : "O");
+            }
+        }
+
+        private bool CheckWin()
+        {
+            int[][] lines = {
+                new[]{0,1,2}, new[]{3,4,5}, new[]{6,7,8}, 
+                new[]{0,3,6}, new[]{1,4,7}, new[]{2,5,8}, 
+                new[]{0,4,8}, new[]{2,4,6}                
+            };
+
+            foreach (var line in lines)
+            {
+                var s1 = List[line[0]].Sign;
+                var s2 = List[line[1]].Sign;
+                var s3 = List[line[2]].Sign;
+
+                if (!string.IsNullOrEmpty(s1) && s1 == s2 && s2 == s3)
+                    return true;
+            }
             return false;
         }
+    }
 
-        private void DisableBoard()
+    public class Box : Base
+    {
+        private string _sign;
+        public string Sign
         {
-            foreach (UIElement element in GameBoard.Children)
-            {
-                if (element is Button button)
-                {
-                    button.IsEnabled = false;
-                }
-            }
+            get => _sign;
+            set { _sign = value; OnProp(); }
         }
+
+        public Relay Click { get; set; }
+    }
+
+    public class Base : INotifyPropertyChanged
+    {
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected void OnProp([CallerMemberName] string name = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        }
+    }
+
+    public class Relay : ICommand
+    {
+        private Action<object> _action;
+        public Relay(Action<object> action) => _action = action;
+        public bool CanExecute(object parameter) => true;
+        public void Execute(object parameter) => _action(parameter);
+        public event EventHandler CanExecuteChanged;
     }
 }

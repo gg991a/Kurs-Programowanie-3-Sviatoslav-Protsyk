@@ -1,244 +1,253 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Media;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
 
 namespace Lista_2
 {
     public partial class Zad3 : Window
     {
-        private const int ROZMIAR_SIATKI = 10;
-        private enum StanKomorki { Puste, Statek, Trafiony, Pudlo }
-
-        private StanKomorki[,] planszaGracza = null!;
-        private StanKomorki[,] planszaWroga = null!;
-        private Button[,] komorkiUiGracza = null!;
-        private Random losowy = new Random();
-
-        private readonly List<int> rozmiaryOkretow = new List<int> { 4, 3, 3, 2, 2, 2, 1, 1, 1, 1 };
-
         public Zad3()
         {
             InitializeComponent();
-            InicjalizujGre();
+            DataContext = new GraStatki(); 
         }
+    }
 
-        private void InicjalizujGre()
+
+    public class Baza : INotifyPropertyChanged
+    {
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected void OnProp([CallerMemberName] string nazwa = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nazwa));
+    }
+
+    public class Komenda : ICommand
+    {
+        private Action<object> _akcja;
+        public Komenda(Action<object> akcja) => _akcja = akcja;
+        public bool CanExecute(object parametr) => true;
+        public void Execute(object parametr) => _akcja(parametr);
+        public event EventHandler CanExecuteChanged;
+    }
+
+
+    public enum Stan { Puste, Statek, Trafiony, Pudlo }
+
+    public class Pole : Baza
+    {
+        private Stan _stan = Stan.Puste;
+        private bool _czyWrog;
+
+        public int X { get; set; }
+        public int Y { get; set; }
+        public Komenda StrzalKomenda { get; set; }
+
+        public Stan AktualnyStan
         {
-            planszaGracza = new StanKomorki[ROZMIAR_SIATKI, ROZMIAR_SIATKI];
-            planszaWroga = new StanKomorki[ROZMIAR_SIATKI, ROZMIAR_SIATKI];
-            komorkiUiGracza = new Button[ROZMIAR_SIATKI, ROZMIAR_SIATKI];
-
-            RozmiescOkrety(planszaGracza);
-            RozmiescOkrety(planszaWroga);
-
-            RysujPlanszeGracza();
-            RysujPlanszeWroga();
-            TekstStatusu.Text = "Twoja tura. Wybierz cel.";
-            SiatkaWroga.IsEnabled = true;
-        }
-
-        private void RysujPlanszeGracza()
-        {
-            SiatkaGracza.Children.Clear();
-            for (int r = 0; r < ROZMIAR_SIATKI; r++)
+            get => _stan;
+            set
             {
-                for (int c = 0; c < ROZMIAR_SIATKI; c++)
+                _stan = value;
+                OnProp();
+                OnProp(nameof(Kolor));
+                OnProp(nameof(Tekst));
+            }
+        }
+
+        public Brush Kolor
+        {
+            get
+            {
+                if (_stan == Stan.Puste) return _czyWrog ? Brushes.AliceBlue : Brushes.White;
+                if (_stan == Stan.Statek) return _czyWrog ? Brushes.AliceBlue : Brushes.Gray;
+                if (_stan == Stan.Trafiony) return Brushes.Crimson;
+                if (_stan == Stan.Pudlo) return Brushes.LightBlue;  
+                return Brushes.White;
+            }
+        }
+
+        public string Tekst
+        {
+            get
+            {
+                if (_stan == Stan.Trafiony) return "X";
+                if (_stan == Stan.Pudlo) return "•";
+                if (_stan == Stan.Statek && !_czyWrog) return "O";
+                return "";
+            }
+        }
+
+        public Pole(int x, int y, bool czyWrog, Action<Pole> poKliknieciu)
+        {
+            X = x; Y = y; _czyWrog = czyWrog;
+            StrzalKomenda = new Komenda(o => poKliknieciu(this));
+        }
+    }
+
+    public class GraStatki : Baza
+    {
+        private const int ROZMIAR = 10;
+        private Random _los = new Random();
+
+        private List<int> _statki = new List<int>
+        {
+            4,
+            3, 3,
+            2, 2, 2,
+            1, 1, 1, 1
+        };
+
+        public ObservableCollection<Pole> PlanszaGracza { get; set; }
+        public ObservableCollection<Pole> PlanszaWroga { get; set; }
+
+        private string _status;
+        public string Status { get => _status; set { _status = value; OnProp(); } }
+
+        private bool _turaGracza;
+        public bool TuraGracza { get => _turaGracza; set { _turaGracza = value; OnProp(); } }
+
+        public Komenda ResetKomenda { get; set; }
+
+        public GraStatki()
+        {
+            ResetKomenda = new Komenda(o => StartGry());
+            StartGry();
+        }
+
+        private void StartGry()
+        {
+            PlanszaGracza = new ObservableCollection<Pole>();
+            PlanszaWroga = new ObservableCollection<Pole>();
+
+            for (int i = 0; i < ROZMIAR * ROZMIAR; i++)
+            {
+                PlanszaGracza.Add(new Pole(i % ROZMIAR, i / ROZMIAR, false, c => { }));
+                PlanszaWroga.Add(new Pole(i % ROZMIAR, i / ROZMIAR, true, StrzalGracza));
+            }
+
+            OnProp(nameof(PlanszaGracza));
+            OnProp(nameof(PlanszaWroga));
+
+            RozmiescStatki(PlanszaGracza);
+            RozmiescStatki(PlanszaWroga);
+
+            TuraGracza = true;
+            Status = "Twój ruch! Wybierz cel na planszy wroga.";
+        }
+
+        private async void StrzalGracza(Pole pole)
+        {
+            if (!TuraGracza || pole.AktualnyStan == Stan.Trafiony || pole.AktualnyStan == Stan.Pudlo) return;
+
+            if (pole.AktualnyStan == Stan.Statek)
+            {
+                pole.AktualnyStan = Stan.Trafiony;
+                SprawdzWygrana(PlanszaWroga, "GRACZ");
+            }
+            else
+            {
+                pole.AktualnyStan = Stan.Pudlo;
+            }
+
+            if (!SprawdzWygrana(PlanszaWroga, "GRACZ"))
+            {
+                TuraGracza = false;
+                Status = "Ruch komputera...";
+                await Task.Delay(500);
+                RuchKomputera();
+            }
+        }
+
+        private void RuchKomputera()
+        {
+            var dostepnePola = PlanszaGracza.Where(c => c.AktualnyStan != Stan.Trafiony && c.AktualnyStan != Stan.Pudlo).ToList();
+            if (dostepnePola.Count == 0) return;
+
+            var cel = dostepnePola[_los.Next(dostepnePola.Count)];
+
+            if (cel.AktualnyStan == Stan.Statek)
+                cel.AktualnyStan = Stan.Trafiony;
+            else
+                cel.AktualnyStan = Stan.Pudlo;
+
+            if (!SprawdzWygrana(PlanszaGracza, "KOMPUTER"))
+            {
+                TuraGracza = true;
+                Status = "Twój ruch!";
+            }
+        }
+
+        private bool SprawdzWygrana(ObservableCollection<Pole> plansza, string kto)
+        {
+            if (!plansza.Any(c => c.AktualnyStan == Stan.Statek))
+            {
+                Status = $"KONIEC GRY! Wygrał: {kto}";
+                TuraGracza = false;
+                return true;
+            }
+            return false;
+        }
+
+        private void RozmiescStatki(ObservableCollection<Pole> plansza)
+        {
+            foreach (var p in plansza) p.AktualnyStan = Stan.Puste;
+
+            foreach (var dlugosc in _statki)
+            {
+                bool ustawiono = false;
+                while (!ustawiono)
                 {
-                    var button = new Button
+                    bool poziomo = _los.Next(2) == 0;
+                    int x = _los.Next(ROZMIAR);
+                    int y = _los.Next(ROZMIAR);
+
+                    if (CzyMoznaPostawic(plansza, x, y, dlugosc, poziomo))
                     {
-                        Margin = new Thickness(0.5),
-                        BorderBrush = Brushes.Gray,
-                        BorderThickness = new Thickness(0.5),
-                        IsEnabled = false,
-                        Background = PobierzPedzelGracza(planszaGracza[r, c]),
-                        Content = PobierzZnakGracza(planszaGracza[r, c])
-                    };
-
-                    komorkiUiGracza[r, c] = button;
-                    SiatkaGracza.Children.Add(button);
-                }
-            }
-        }
-
-        private void RysujPlanszeWroga()
-        {
-            SiatkaWroga.Children.Clear();
-            for (int r = 0; r < ROZMIAR_SIATKI; r++)
-            {
-                for (int c = 0; c < ROZMIAR_SIATKI; c++)
-                {
-                    var button = new Button
-                    {
-                        Margin = new Thickness(1),
-                        Tag = new Point(c, r),
-                        Background = PobierzPedzelWroga(planszaWroga[r, c]),
-                        Content = PobierzZnakWroga(planszaWroga[r, c])
-                    };
-
-                    button.Click += KomorkaWroga_Click;
-
-                    if (planszaWroga[r, c] == StanKomorki.Trafiony || planszaWroga[r, c] == StanKomorki.Pudlo)
-                        button.IsEnabled = false;
-
-                    SiatkaWroga.Children.Add(button);
-                }
-            }
-        }
-
-        private Brush PobierzPedzelGracza(StanKomorki stan)
-        {
-            switch (stan)
-            {
-                case StanKomorki.Trafiony:
-                    return Brushes.DarkRed;     
-                case StanKomorki.Pudlo:
-                    return Brushes.LightGray;   
-                default:
-                    return Brushes.White;       
-            }
-        }
-
-        private Brush PobierzPedzelWroga(StanKomorki stan)
-        {
-            switch (stan)
-            {
-                case StanKomorki.Trafiony:
-                    return Brushes.Crimson;
-                case StanKomorki.Pudlo:
-                    return Brushes.LightSteelBlue;
-                default:
-                    return Brushes.AliceBlue;
-            }
-        }
-
-        private string PobierzZnakGracza(StanKomorki stan)
-        {
-            switch (stan)
-            {
-                case StanKomorki.Statek: return "O"; 
-                case StanKomorki.Trafiony: return "X";
-                case StanKomorki.Pudlo: return "•";
-                default: return "";
-            }
-        }
-
-        private string PobierzZnakWroga(StanKomorki stan)
-        {
-            switch (stan)
-            {
-                case StanKomorki.Trafiony: return "X";
-                case StanKomorki.Pudlo: return "•";
-                default: return "";
-            }
-        }
-
-        private void RozmiescOkrety(StanKomorki[,] plansza)
-        {
-            foreach (int rozmiar in rozmiaryOkretow)
-            {
-                bool umieszczono = false;
-                while (!umieszczono)
-                {
-                    bool poziomo = losowy.Next(2) == 0;
-                    int r = losowy.Next(ROZMIAR_SIATKI);
-                    int c = losowy.Next(ROZMIAR_SIATKI);
-
-                    if (CzyMoznaUmiescic(plansza, r, c, rozmiar, poziomo))
-                    {
-                        for (int i = 0; i < rozmiar; i++)
+                        for (int i = 0; i < dlugosc; i++)
                         {
-                            if (poziomo) plansza[r, c + i] = StanKomorki.Statek;
-                            else plansza[r + i, c] = StanKomorki.Statek;
+                            int idx = poziomo ? y * ROZMIAR + (x + i) : (y + i) * ROZMIAR + x;
+                            plansza[idx].AktualnyStan = Stan.Statek;
                         }
-                        umieszczono = true;
+                        ustawiono = true;
                     }
                 }
             }
         }
 
-        private bool CzyMoznaUmiescic(StanKomorki[,] plansza, int r, int c, int rozmiar, bool poziomo)
+        private bool CzyMoznaPostawic(ObservableCollection<Pole> plansza, int x, int y, int dlugosc, bool poziomo)
         {
             if (poziomo)
             {
-                if (c + rozmiar > ROZMIAR_SIATKI) return false;
-                for (int i = 0; i < rozmiar; i++)
-                    if (plansza[r, c + i] != StanKomorki.Puste) return false;
+                if (x + dlugosc > ROZMIAR) return false;
             }
             else
             {
-                if (r + rozmiar > ROZMIAR_SIATKI) return false;
-                for (int i = 0; i < rozmiar; i++)
-                    if (plansza[r + i, c] != StanKomorki.Puste) return false;
+                if (y + dlugosc > ROZMIAR) return false;
             }
-            return true;
-        }
 
-        private async void KomorkaWroga_Click(object sender, RoutedEventArgs e)
-        {
-            var button = (Button)sender;
-            var coords = (Point)button.Tag;
-            int r = (int)coords.Y;
-            int c = (int)coords.X;
+            int startX = Math.Max(0, x - 1);
+            int startY = Math.Max(0, y - 1);
 
-            PrzetworzStrzal(planszaWroga, r, c);
-            button.Background = PobierzPedzelWroga(planszaWroga[r, c]);
-            button.Content = PobierzZnakWroga(planszaWroga[r, c]);
-            button.IsEnabled = false;
+            int koniecX = poziomo ? Math.Min(ROZMIAR - 1, x + dlugosc) : Math.Min(ROZMIAR - 1, x + 1);
+            int koniecY = poziomo ? Math.Min(ROZMIAR - 1, y + 1) : Math.Min(ROZMIAR - 1, y + dlugosc);
 
-            if (SprawdzZwyciezce(planszaWroga, "Gracz")) return;
-
-            SiatkaWroga.IsEnabled = false;
-            TekstStatusu.Text = "Tura Komputera...";
-            await Task.Delay(500);
-            TuraKomputera();
-        }
-
-        private void TuraKomputera()
-        {
-            int r, c;
-            do
+            for (int r = startY; r <= koniecY; r++)
             {
-                r = losowy.Next(ROZMIAR_SIATKI);
-                c = losowy.Next(ROZMIAR_SIATKI);
-            } while (planszaGracza[r, c] == StanKomorki.Trafiony || planszaGracza[r, c] == StanKomorki.Pudlo);
-
-            PrzetworzStrzal(planszaGracza, r, c);
-            komorkiUiGracza[r, c].Background = PobierzPedzelGracza(planszaGracza[r, c]);
-            komorkiUiGracza[r, c].Content = PobierzZnakGracza(planszaGracza[r, c]);
-
-            if (SprawdzZwyciezce(planszaGracza, "Komputer")) return;
-
-            TekstStatusu.Text = "Twoja tura. Wybierz cel.";
-            SiatkaWroga.IsEnabled = true;
-        }
-
-        private void PrzetworzStrzal(StanKomorki[,] plansza, int r, int c)
-        {
-            if (plansza[r, c] == StanKomorki.Statek)
-                plansza[r, c] = StanKomorki.Trafiony;
-            else if (plansza[r, c] == StanKomorki.Puste)
-                plansza[r, c] = StanKomorki.Pudlo;
-        }
-
-        private bool SprawdzZwyciezce(StanKomorki[,] plansza, string nazwa)
-        {
-            for (int r = 0; r < ROZMIAR_SIATKI; r++)
-                for (int c = 0; c < ROZMIAR_SIATKI; c++)
-                    if (plansza[r, c] == StanKomorki.Statek)
+                for (int c = startX; c <= koniecX; c++)
+                {
+                    if (plansza[r * ROZMIAR + c].AktualnyStan == Stan.Statek)
                         return false;
+                }
+            }
 
-            TekstStatusu.Text = $"Koniec gry! {nazwa} wygrywa!";
-            SiatkaWroga.IsEnabled = false;
-            MessageBox.Show(TekstStatusu.Text, "Koniec Gry");
             return true;
-        }
-
-        private void PrzyciskNowaGra_Click(object sender, RoutedEventArgs e)
-        {
-            InicjalizujGre();
         }
     }
 }
