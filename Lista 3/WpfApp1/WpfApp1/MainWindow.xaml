@@ -1,0 +1,31 @@
+﻿<Window x:Class="WpfApp1.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:WpfApp1.ViewModel"
+        Title="Lista Osób" Height="450" Width="800">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <DataGrid Grid.Row="0"
+                  ItemsSource="{Binding People}"
+                  SelectedItem="{Binding SelectedPerson, Mode=TwoWay}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Imię" Binding="{Binding FirstName}" Width="*"/>
+                <DataGridTextColumn Header="Nazwisko" Binding="{Binding LastName}" Width="*"/>
+                <DataGridTextColumn Header="PESEL" Binding="{Binding PESEL}" Width="*"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="10">
+            <Button Content="Dodaj Osobę" Command="{Binding AddPersonCommand}" Width="100" Margin="5"/>
+            <Button Content="Edytuj Osobę" Command="{Binding EditPersonCommand}" Width="100" Margin="5"/>
+            <Button Content="Zapisz Dane" Command="{Binding SaveCommand}" Width="100" Margin="5"/>
+        </StackPanel>
+    </Grid>
+</Window>
