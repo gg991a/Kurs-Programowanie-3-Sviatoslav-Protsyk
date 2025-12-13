@@ -1,14 +1,22 @@
 ﻿<Window x:Class="Lista_4.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Sklep Sportowy - Pracownicy" Height="450" Width="600">
+        xmlns:local="clr-namespace:Lista_4"
+        Title="Sklep Sportowy - Pracownicy (MVVM)" Height="450" Width="600">
+
+    <Window.DataContext>
+        <local:MainViewModel/>
+    </Window.DataContext>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <ListView x:Name="lvEmployees" Grid.Row="0" Margin="10">
+        <ListView Grid.Row="0" Margin="10" 
+                  ItemsSource="{Binding Employees}" 
+                  SelectedItem="{Binding SelectedEmployee}">
             <ListView.View>
                 <GridView>
                     <GridViewColumn Header="Zdjęcie" Width="80">
@@ -26,11 +34,11 @@
         </ListView>
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="10">
-            <Button Content="Dodaj" Width="80" Margin="5" Click="Add_Click"/>
-            <Button Content="Edytuj" Width="80" Margin="5" Click="Edit_Click"/>
-            <Button Content="Usuń" Width="80" Margin="5" Click="Delete_Click"/>
-            <Button Content="Zapisz XML" Width="80" Margin="20,5,5,5" Click="SaveXML_Click" Background="LightBlue"/>
-            <Button Content="Wczytaj XML" Width="80" Margin="5" Click="LoadXML_Click" Background="LightBlue"/>
+            <Button Content="Dodaj" Width="80" Margin="5" Command="{Binding AddCommand}"/>
+            <Button Content="Edytuj" Width="80" Margin="5" Command="{Binding EditCommand}"/>
+            <Button Content="Usuń" Width="80" Margin="5" Command="{Binding DeleteCommand}"/>
+            <Button Content="Zapisz XML" Width="80" Margin="20,5,5,5" Command="{Binding SaveXmlCommand}" Background="LightBlue"/>
+            <Button Content="Wczytaj XML" Width="80" Margin="5" Command="{Binding LoadXmlCommand}" Background="LightBlue"/>
         </StackPanel>
     </Grid>
 </Window>
