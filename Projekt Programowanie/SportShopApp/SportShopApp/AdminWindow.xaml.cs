@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 
 namespace SportShopApp
@@ -16,8 +15,11 @@ namespace SportShopApp
 
         private void LoadAllData()
         {
-            AdminProductsList.ItemsSource = db.GetAllProducts();
-            OrdersList.ItemsSource = db.GetAllOrders();
+            if (AdminProductsList != null)
+                AdminProductsList.ItemsSource = db.GetAllProducts();
+
+            if (OrdersList != null)
+                OrdersList.ItemsSource = db.GetAllOrders();
         }
 
         private void Refresh_Click(object sender, RoutedEventArgs e)
@@ -35,20 +37,38 @@ namespace SportShopApp
         private void EditProduct_Click(object sender, RoutedEventArgs e)
         {
             Button btn = (Button)sender;
-            Product productToEdit = (Product)btn.Tag;
+            Product p = (Product)btn.Tag;
 
-            AddProductWindow editWin = new AddProductWindow(productToEdit);
+            AddProductWindow editWin = new AddProductWindow(p);
             editWin.ShowDialog();
-            LoadAllData(); 
+            LoadAllData();
+        }
+
+        private void DeleteProduct_Click(object sender, RoutedEventArgs e)
+        {
+            Button btn = (Button)sender;
+            Product p = (Product)btn.Tag;
+
+            var res = MessageBox.Show($"Usunąć produkt: {p.Name}?", "Potwierdzenie", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+
+            if (res == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    db.DeleteProduct(p.Id);
+                    LoadAllData();
+                }
+                catch (System.Exception ex)
+                {
+                    MessageBox.Show("Nie można usunąć! Produkt jest w historii zamówień.\n" + ex.Message);
+                }
+            }
         }
 
         private void Logout_Click(object sender, RoutedEventArgs e)
         {
-            LoginWindow login = new LoginWindow();
-            login.Show();
+            new LoginWindow().Show();
             this.Close();
         }
-
-        private void Export_Click(object sender, RoutedEventArgs e) { }
     }
 }

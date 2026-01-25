@@ -12,7 +12,8 @@ namespace SportShopApp
         private void Login_Click(object sender, RoutedEventArgs e)
         {
             DatabaseHelper db = new DatabaseHelper();
-                User user = db.Login(UserBox.Text, PassBox.Password);
+
+            User user = db.Login(UsernameBox.Text, PasswordBox.Password);
 
             if (user != null)
             {
@@ -33,6 +34,11 @@ namespace SportShopApp
             {
                 MessageBox.Show("Niepoprawny login lub hasło!");
             }
+        }
+
+        private void Exit_Click(object sender, RoutedEventArgs e)
+        {
+            Application.Current.Shutdown();
         }
     }
 }

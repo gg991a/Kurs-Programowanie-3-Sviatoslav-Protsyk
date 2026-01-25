@@ -179,5 +179,19 @@ namespace SportShopApp
                 }
             }
         }
+
+        public void DeleteProduct(int productId)
+        {
+            using (SqlConnection conn = new SqlConnection(connectionString))
+            {
+                conn.Open();
+                string sql = "DELETE FROM Products WHERE Id = @Id";
+                using (SqlCommand cmd = new SqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@Id", productId);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
     }
 }
