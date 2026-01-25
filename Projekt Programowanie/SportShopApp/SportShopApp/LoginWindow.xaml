@@ -1,0 +1,14 @@
+﻿<Window x:Class="SportShopApp.LoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Logowanie" Height="250" Width="300" WindowStartupLocation="CenterScreen">
+    <StackPanel Margin="20" VerticalAlignment="Center">
+        <TextBlock Text="Login:" Margin="0,0,0,5"/>
+        <TextBox x:Name="UserBox" Margin="0,0,0,10" Height="25"/>
+
+        <TextBlock Text="Hasło:" Margin="0,0,0,5"/>
+        <PasswordBox x:Name="PassBox" Margin="0,0,0,20" Height="25"/>
+
+        <Button Content="Zaloguj się" Click="Login_Click" Height="30" FontWeight="Bold"/>
+    </StackPanel>
+</Window>
